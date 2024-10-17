@@ -251,6 +251,8 @@ class DMD:
             rank_thresh=None,
             rank_explained_variance=None,
             lamb=0,
+            method="NOT_precomputed",
+            **kwargs
         ):
         """
         Computes the Havok DMD matrix.
@@ -313,15 +315,19 @@ class DMD:
                 self.rank = self.H.shape[-1]
 
             # reshape for leastsquares
-            if self.ntrials > 1:
-                V = self.V.reshape(self.H.shape)
+            if method != "precomputed":
+                if self.ntrials > 1:
+                    V = self.V.reshape(self.H.shape)
                 #first reshape back into Hankel shape, separated by trials
-                newshape = (self.H.shape[0]*(self.H.shape[1]-1),self.H.shape[2])
-                Vt_minus = V[:,:-1].reshape(newshape)
-                Vt_plus = V[:,1:].reshape(newshape)
+                    newshape = (self.H.shape[0]*(self.H.shape[1]-1),self.H.shape[2])
+                    Vt_minus = V[:,:-1].reshape(newshape)
+                    Vt_plus = V[:,1:].reshape(newshape)
+                else:
+                    Vt_minus = self.V[:-1]
+                    Vt_plus = self.V[1:]
             else:
-                Vt_minus = self.V[:-1]
-                Vt_plus = self.V[1:]
+                Vt_minus = kwargs["Vt_minus"]
+                Vt_plus = kwargs["Vt_plus"]
 
             if self.rank is None:
                 if self.S[-1] > self.rank_thresh:
@@ -436,8 +442,7 @@ class DMD:
                 H_test_havok_dmd[:, t] = (A @ H_test[:, t - 1].transpose(-2, -1)).transpose(-2, -1)
             else:
                 H_test_havok_dmd[:, t] = (A @ H_test_havok_dmd[:, t - 1].transpose(-2, -1)).transpose(-2, -1)
-
-        pred_data = torch.hstack([test_data[...,:(self.n_delays - 1)*self.delay_interval + 1, :], H_test_havok_dmd[...,1:, :self.n]])
+        pred_data = torch.hstack([test_data[:, :(self.n_delays - 1)*self.delay_interval + 1], H_test_havok_dmd[:, 1:, :self.n]])
 
         if ndim == 2:
             pred_data = pred_data[0]

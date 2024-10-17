@@ -86,6 +86,7 @@ class DeLASE:
             max_freq=None,
             max_unstable_freq=None
         ):
+        #print(max_freq, max_unstable_freq)
         self.max_freq = self.max_freq if max_freq is None else max_freq
         self.max_unstable_freq = self.max_unstable_freq if max_unstable_freq is None else max_unstable_freq
         stability_params = torch.real(self.chroots)
@@ -115,7 +116,7 @@ class DeLASE:
         self.max_unstable_freq = self.max_unstable_freq if max_unstable_freq is None else max_unstable_freq
 
         if self.verbose:
-            print("Computing jacobians...")
+            print("Computing jacbians...")
         self.compute_jacobians()
             # raise ValueError("Jacobians are needed for stability estimation! Run compute_jacobians first")
 
@@ -181,10 +182,10 @@ class DeLASE:
     def to(self, device):
         self.DMD.to(device)
         if self.Js is not None:
-            self.Js = self.Js.to(device)
+            self.Js.to(device)
         if self.chroots is not None:
-            self.chroots = self.chroots.to(device)
+            self.chroots.to(device)
         if self.stability_params is not None:
-            self.stability_params = self.stability_params.to(device)
+            self.stability_params.to(device)
         if self.stability_freqs is not None:
-            self.stability_freqs = self.stability_freqs.to(device)
+            self.stability_freqs.to(device)
