@@ -352,6 +352,8 @@ class DMD:
             lamb=None,
             device=None,
             verbose=None,
+            method=None,
+            **kwargs
         ):
         """
         Parameters
@@ -400,6 +402,9 @@ class DMD:
             or alternatively 0 if the intenion is to use GPU device 0. Defaults to None - provide only 
             if you want to override the value from the init.
 
+        method: string
+            When the string is set to "precomputed", the code will assume Vt_plus and Vt_minus are provided as keyword arguments
+
         verbose: bool
             If True, print statements will be provided about the progress of the fitting procedure. 
             Defaults to None - provide only if you want to override the value from the init.
@@ -407,11 +412,14 @@ class DMD:
         # if parameters are provided, overwrite them from the init
         self.device = self.device if device is None else device
         self.verbose = self.verbose if verbose is None else verbose
+
+        if "Vt_minus" in kwargs:
+            print(f"Data shape: {kwargs['Vt_minus'].shape}")
     
         # compute hankel
         self.compute_hankel(data, n_delays, delay_interval)
         self.compute_svd()
-        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb)
+        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb, method, **kwargs)
 
     def predict(
         self,
