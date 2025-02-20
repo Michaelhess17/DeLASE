@@ -199,3 +199,5 @@ nohup.out
 outputs
 figures/
 tmp.ipynb
+VDP_FMs.npy
+VDP_oscillators.npy
