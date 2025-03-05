@@ -27,12 +27,13 @@ window_length = 30
 
 # Create a function to load the data
 def load_data(data_path="outputs/VDP_oscillators.npy", dt=1/20):
-    data = jnp.load(project_path.joinpath(data_path))[:, :, ::2]
+    data = jnp.load(project_path.joinpath(data_path))[:, :, :]
     data = data.reshape(data.shape[0]*data.shape[1], data.shape[2], data.shape[3])
 
     # Apply convolution to all trials and features at once
-    new_data = jax_utils.convolve_trials(data[:10, :2**12, :1])
+    # new_data = jax_utils.convolve_trials(data[:, 5000:, 1:])
 
+    new_data = data[:, 5000:10000, 1:]
     # Standardize the data
     new_data = (new_data - jnp.mean(new_data, axis=1)[:, None, :]) / jnp.std(new_data, axis=1)[:, None, :]
     return new_data
@@ -42,15 +43,15 @@ data = load_data()
 print(f"Data shape: {data.shape}")
 
 # Set up the parameters
-n_delays = 1
-matrix_size = 10
+n_delays = None
+matrix_size = 500
 delay_interval = 1
 rank = None
 rank_thresh = None
 rank_explained_variance = None
 lamb=0
-dt = 0.004
-N_time_bins = 50
+dt = 0.02
+N_time_bins = None
 max_freq=(1/dt)//2
 max_unstable_freq=(1/dt)//2
 device = torch.device("cuda")
@@ -60,8 +61,8 @@ data = torch.from_numpy(np.array(data)).to(device)
 # Get the AICs
 # matrix_sizes = np.array([10, 20, 50, 100, 200, 300, 500, 750, 1000])
 # ranks = np.array([3, 5, 10, 25, 50, 75, 100, 125, 150, 200, *range(250, 801, 50), 900, 1000])
-matrix_sizes = np.array([5, 10, 20, 50, 100, 200, 500, 1000])
-ranks = np.array([3, 5, 10, 20, 50, 100, 200, 500, 1000])
+matrix_sizes = np.array([500])
+ranks = np.array([500])
 
 aics = get_aics(data, matrix_sizes, ranks, dt=dt, max_freq=max_freq, max_unstable_freq=max_unstable_freq, device=device, delay_interval=delay_interval, N_time_bins=N_time_bins)
 
@@ -74,7 +75,7 @@ top_percent = 10
 if full_output:
     top_percent = None
 
-trial_lens = np.logspace(8, 8+n_splits-1, n_splits, base=2).astype(int)
+trial_lens = np.logspace(10, 10+n_splits-1, n_splits, base=2).astype(int)
 # skip = trial_lens // 2
 skip = 50*np.ones_like(trial_lens)
 all_λs = np.empty((len(trial_lens), data.shape[0]), dtype=object)
@@ -83,7 +84,7 @@ for idx, trial_len in enumerate(trial_lens):
     λs = get_λs(data, aics, matrix_sizes, ranks, full_output=full_output,
            top_percent=top_percent, dt=dt, max_freq=None, max_unstable_freq=None,
            device=torch.device("cuda"), trial_len=trial_len, skip=skip[idx],  n_delays=None,
-                                delay_interval=1, N_time_bins=50)
+                                delay_interval=1, N_time_bins=None)
     for jdx in range(data.shape[0]):
         all_λs[idx, jdx] = λs[jdx]
 

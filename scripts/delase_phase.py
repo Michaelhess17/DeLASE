@@ -78,10 +78,12 @@ class DeLASEPhaser:
     def fit_phase_range(self, phase_start=0, phase_end=100, height=0.85, distance=80):
         self.assign_data_to_percent_segments()
         data_in_range = self.phased_signals[:, :, phase_start:phase_end].swapaxes(1, 2)
-        Vt_minus = data_in_range[:, :, :-1].reshape(-1, data_in_range.shape[-1])
-        Vt_plus = data_in_range[:, :, 1:].reshape(-1, data_in_range.shape[-1])
-        self.DMD.fit(Vt_minus=Vt_minus, Vt_plus=Vt_plus)
+        # Vt_minus = data_in_range[:, :-1, :].reshape(-1, data_in_range.shape[-1])
+        # Vt_plus = data_in_range[:, 1:, :].reshape(-1, data_in_range.shape[-1])
+        # self.DMD.fit(Vt_minus=Vt_minus, Vt_plus=Vt_plus, method="precomputed")
+        self.DMD.fit(data=data_in_range)
         params, freqs = self.get_stability()
+        return params, freqs
 
     def compute_jacobians(
             self,
@@ -215,22 +217,42 @@ class DeLASEPhaser:
         if self.stability_freqs is not None:
             self.stability_freqs.to(device)
 
-ts = np.linspace(0, 100, 10000)
-data = np.stack([np.sin(ts), np.cos(ts)]).T
+ts = np.linspace(0, 15, 1500)
+num_subjects = 2
+for subject in range(num_subjects):
+    data = torch.from_numpy(np.load("/mnt/Mouse_Face_Project/Desktop/Data/Julia/data/human_data.npy")[subject])
 
-delase = DeLASEPhaser(data,
-            n_delays=None,
-            matrix_size=20,
-            delay_interval=1,
-            rank=20,
-            rank_thresh=None,
-            rank_explained_variance=None,
-            lamb=0,
-            dt=ts[1]-ts[0],
-            N_time_bins=None,
-            max_freq=None,
-            max_unstable_freq=None,
-            device=torch.device("cpu"),
-            n_segments=101,
-            verbose=True)
-delase.fit_phase_range(phase_start=0, phase_end=100)
+    delase = DeLASEPhaser(data,
+                n_delays=None,
+                matrix_size=15,
+                delay_interval=1,
+                rank=15,
+                rank_thresh=None,
+                rank_explained_variance=None,
+                lamb=0,
+                dt=ts[1]-ts[0],
+                N_time_bins=None,
+                max_freq=None,
+                max_unstable_freq=None,
+                device=torch.device("cpu"),
+                n_segments=101,
+                verbose=True)
+
+
+    steps = np.arange(start=0, stop=101, step=25)
+    all_params, all_freqs = np.zeros(len(steps) - 1, dtype=object), np.zeros(len(steps) - 1, dtype=object)
+    for idx, (start, stop) in enumerate(zip(steps[:-1], steps[1:])):
+        print(start, stop)
+        params, freqs = delase.fit_phase_range(phase_start=start, phase_end=stop)
+        all_params[idx] = params
+        all_freqs[idx] = freqs
+
+    import matplotlib
+    matplotlib.use("kitcat")
+    import matplotlib.pyplot as plt
+
+    plt.plot(np.exp([a.cpu().numpy() for a in all_params]), marker='x')
+    plt.savefig(f"/mnt/Mouse_Face_Project/Desktop/Data/Python/delase/figures/human_{subject}_stability_by_phase.png")
+    plt.clf()
+    plt.cla()
+    plt.close('all')
