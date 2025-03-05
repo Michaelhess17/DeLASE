@@ -39,7 +39,7 @@ def simulate_single_oscillator(
     dt: float
 ) -> jnp.ndarray:
     
-    oscillator = VanDerPol(mu=mu)
+    oscillator = VanDerPol(mu=mu, noise_scale=0.0)
     ts = jnp.arange(t_span[0], t_span[1], dt)
     
     # Define the terms for the SDE
@@ -86,7 +86,7 @@ def simulate_oscillators(
     # Generate random mu values and initial conditions
     key1, key2, key3 = jax.random.split(key, 3)
     mus = jnp.linspace(mu_range[0], mu_range[1], n_oscillators, dtype=jnp.float32)
-    initial_conditions = jax.random.uniform(key2, shape=(n_replicates, n_oscillators, 2), minval=-3, maxval=3)
+    initial_conditions = jax.random.normal(key2, shape=(n_replicates, n_oscillators, 2))
     
     # Generate simulation keys for each oscillator
     sim_keys = jax.random.split(key3, n_oscillators)
@@ -107,11 +107,11 @@ def simulate_oscillators(
 def main():
 
     # Simulation parameters
-    n_oscillators = 50
-    mu_range = (1.0, 3.0)
-    t_span = (0., 30.)
+    n_oscillators = 1 
+    mu_range = (2.0, 2.0)
+    t_span = (0., 400.)
     n_replicates = 1
-    dt = 0.002
+    dt = 0.02
 
     key = jax.random.PRNGKey(42)
     ts, solutions, mus = simulate_oscillators(key, n_oscillators, mu_range, t_span, n_replicates, dt)
