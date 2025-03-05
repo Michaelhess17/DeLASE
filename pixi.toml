@@ -13,7 +13,6 @@ python = "3.11.*"
 seaborn = ">=0.13.2,<0.14"
 polars = ">=1.17.1,<2"
 numpy = ">=2.2.0,<3"
-matplotlib = ">=3.10.0,<4"
 scikit-learn = ">=1.6.0,<2"
 resample = ">=1.10.1,<2"
 tqdm = ">=4.67.1,<5"
@@ -35,3 +34,4 @@ optax = ">=0.2.4, <0.3"
 ddfa_node = { path = "../NeuralODE/DDFA_NODE", editable = true}
 delase = { path = ".", editable = true}
 kitcat = ">=1.2.1, <2"
+matplotlib = "*"
