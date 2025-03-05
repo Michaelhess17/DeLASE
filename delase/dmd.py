@@ -165,6 +165,8 @@ class DMD:
             self.window = self.data.shape[0]
             self.n = self.data.shape[1]
             self.ntrials = 1
+        return self.data
+        
         
     def compute_hankel(
             self,
@@ -252,7 +254,9 @@ class DMD:
             rank_explained_variance=None,
             lamb=0,
             method="NOT_precomputed",
-            **kwargs
+            *,
+            Vt_minus=None,
+            Vt_plus=None
         ):
         """
         Computes the Havok DMD matrix.
@@ -316,6 +320,7 @@ class DMD:
 
             # reshape for leastsquares
             if method != "precomputed":
+                # print(f"self.H.shape: {self.H.shape} // self.V.shape: {self.V.shape}")
                 if self.ntrials > 1:
                     V = self.V.reshape(self.H.shape)
                 #first reshape back into Hankel shape, separated by trials
@@ -325,9 +330,6 @@ class DMD:
                 else:
                     Vt_minus = self.V[:-1]
                     Vt_plus = self.V[1:]
-            else:
-                Vt_minus = kwargs["Vt_minus"]
-                Vt_plus = kwargs["Vt_plus"]
 
             if self.rank is None:
                 if self.S[-1] > self.rank_thresh:
@@ -353,7 +355,9 @@ class DMD:
             device=None,
             verbose=None,
             method=None,
-            **kwargs
+            *,
+            Vt_minus=None,
+            Vt_plus=None
         ):
         """
         Parameters
@@ -413,13 +417,10 @@ class DMD:
         self.device = self.device if device is None else device
         self.verbose = self.verbose if verbose is None else verbose
 
-        if "Vt_minus" in kwargs:
-            print(f"Data shape: {kwargs['Vt_minus'].shape}")
-    
         # compute hankel
         self.compute_hankel(data, n_delays, delay_interval)
         self.compute_svd()
-        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb, method, **kwargs)
+        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb, method, Vt_minus=Vt_minus, Vt_plus=Vt_plus)
 
     def predict(
         self,
