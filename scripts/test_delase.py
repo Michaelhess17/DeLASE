@@ -3,7 +3,8 @@ import os
 import pathlib
 from tqdm.auto import tqdm
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["JAX_PLATFORMS"] = "cpu"
 
 # Numerical processing imports
 import matplotlib
@@ -45,7 +46,7 @@ def load_data(data_path="outputs/VDP_oscillators.npy", dt=1 / 20):
     # Apply convolution to all trials and features at once
     # new_data = jax_utils.convolve_trials(data[:, 5000:, 1:])
 
-    new_data = data[:, 5000:10000, 1:]
+    new_data = data[:, 5000:12000, 1:]
     # Standardize the data
     new_data = (new_data - jnp.mean(new_data, axis=1)[:, None, :]) / jnp.std(
         new_data, axis=1
@@ -69,13 +70,13 @@ dt = 0.02
 N_time_bins = None
 max_freq = (1 / dt) // 2
 max_unstable_freq = (1 / dt) // 2
-device = torch.device("cuda")
+device = torch.device("cpu")
 verbose = True
 data = torch.from_numpy(np.array(data)).to(device)
 
 # Get the AICs
-matrix_sizes = np.array([50, 200, 500])
-ranks = np.array([10, 25, 50, 100, 500])
+matrix_sizes = np.array([10, 50, 200])
+ranks = np.array([10, 50, 200])
 # matrix_sizes = np.array([10, 20, 50, 100, 200, 300, 500, 750, 1000])
 # ranks = np.array([3, 5, 10, 25, 50, 75, 100, 125, 150, 200, *range(250, 801, 50), 900, 1000])
 # matrix_sizes = np.array([50])
@@ -101,7 +102,7 @@ top_percent = 10
 if full_output:
     top_percent = None
 
-trial_lens = np.logspace(9.3, 11.3, n_splits, base=2).astype(int)
+trial_lens = np.logspace(9.3, 10.8, n_splits, base=2).astype(int)
 # skip = trial_lens // 3
 skip_values = np.array([20, 100, 500])  # Add different skip values to test
 
@@ -137,7 +138,13 @@ for skip_idx, skip_val in enumerate(skip_values):
             delay_interval=1,
             N_time_bins=None,
         )
-        all_λs[idx] = λs
+        new_λs = np.zeros((λs.shape[0], λs.shape[1], λs.shape[2]), dtype=object)
+        for i in range(λs.shape[0]):
+            for j in range(λs.shape[1]):
+                for k in range(λs.shape[2]):
+                    new_λs[i, j, k] = λs[i, j, k, :]
+
+        all_λs[idx] = new_λs
 
     # Process λs for each parameter combination
     one_over_n_splits = (1 / np.arange(2, n_splits + 2, 1)) / dataset_size

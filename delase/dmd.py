@@ -37,6 +37,7 @@ def embed_signal_torch(data, n_delays, delay_interval=1):
 
         # initialize the embedding
         if data.ndim == 3:
+            print(f"embedding data with shape: {data.shape}")
             embedding = torch.zeros((data.shape[0], data.shape[1] - (n_delays - 1)*delay_interval, data.shape[2]*n_delays)).to(device)
         else:
             embedding = torch.zeros((data.shape[0] - (n_delays - 1)*delay_interval, data.shape[1]*n_delays)).to(device)
@@ -418,9 +419,16 @@ class DMD:
         self.verbose = self.verbose if verbose is None else verbose
 
         # compute hankel
-        self.compute_hankel(data, n_delays, delay_interval)
-        self.compute_svd()
-        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb, method, Vt_minus=Vt_minus, Vt_plus=Vt_plus)
+        if method != "precomputed":
+            self.compute_hankel(data, n_delays, delay_interval)
+            self.compute_svd()
+        else:
+            if isinstance(data, np.ndarray):
+                data = torch.from_numpy(data).float().to(self.device)
+            self.H = data
+            self.ntrials = data.shape[0]
+            self.compute_svd()
+        self.compute_havok_dmd(rank, rank_thresh, rank_explained_variance, lamb, method="NOT_precomputed", Vt_minus=Vt_minus, Vt_plus=Vt_plus)
 
     def predict(
         self,

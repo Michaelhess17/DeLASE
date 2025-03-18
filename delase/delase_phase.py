@@ -63,25 +63,56 @@ class DeLASEPhaser:
         self.stability_params = None
         self.stability_freqs = None
         self.n_segments = n_segments
+        
+        # New attributes to store phase information and embedded data
+        self.phased_signals = None
+        self.embedded_data = None
+        self.phase_indices = None
 
     
     def assign_data_to_percent_segments(self, phaser_feats=None, trim_cycles=1, height=0.85, distance=80):
         # TODO: remove trim_cycles and use all data
         if isinstance(self.data, torch.Tensor):
-            raw = self.data.T.cpu().numpy()
+            raw = self.embedded_data.T.cpu().numpy()
         else:
-            raw = self.data.T
+            raw = self.embedded_data.T
         # Assess phase using Phaser
-        cycle_list, _ = get_phased_signals(raw, phaser_feats, trim_cycles, self.n_segments, height, distance)
+        cycle_list, phase_indices = get_phased_signals(raw, phaser_feats, trim_cycles, self.n_segments, height, distance)
         self.phased_signals = cycle_list # will have shape (nCycles, nFeatures, nSegments)
+        self.phase_indices = phase_indices  # Store the phase indices for later use
+        
+    def create_embedded_data(self):
+        """Create the Takens embedded data for the full dataset once"""
+        if isinstance(self.data, torch.Tensor):
+            data = self.data.cpu().numpy()
+        else:
+            data = self.data
+            
+        # Pre-compute the embedded data for the entire time series
+        # This creates a matrix where each row is the state at time t with delays
+        n_samples = data.shape[0]
+        embedded_data = np.zeros((n_samples - (self.n_delays-1)*self.delay_interval, self.n*self.n_delays))
+        
+        for i in range(self.n_delays):
+            delay_offset = i * self.delay_interval
+            embedded_data[:, i*self.n:(i+1)*self.n] = data[delay_offset:n_samples-(self.n_delays-1-i)*self.delay_interval]
+            
+        if isinstance(self.data, torch.Tensor):
+            self.embedded_data = torch.from_numpy(embedded_data).to(self.device)
+        else:
+            self.embedded_data = embedded_data
+        
+        return self.embedded_data
 
     def fit_phase_range(self, phase_start=0, phase_end=100, height=0.85, distance=80):
-        self.assign_data_to_percent_segments()
+        # Create embedded data if not already done
+        if self.embedded_data is None:
+            self.create_embedded_data()        # First ensure we have the phase information
+        
+        self.assign_data_to_percent_segments(height=height, distance=distance)
         data_in_range = self.phased_signals[:, :, phase_start:phase_end].swapaxes(1, 2)
-        # Vt_minus = data_in_range[:, :-1, :].reshape(-1, data_in_range.shape[-1])
-        # Vt_plus = data_in_range[:, 1:, :].reshape(-1, data_in_range.shape[-1])
-        # self.DMD.fit(Vt_minus=Vt_minus, Vt_plus=Vt_plus, method="precomputed")
-        self.DMD.fit(data=data_in_range)
+        self.DMD.fit(data=data_in_range, method="precomputed")
+            
         params, freqs = self.get_stability()
         return params, freqs
 
@@ -216,43 +247,5 @@ class DeLASEPhaser:
             self.stability_params.to(device)
         if self.stability_freqs is not None:
             self.stability_freqs.to(device)
-
-ts = np.linspace(0, 15, 1500)
-num_subjects = 2
-for subject in range(num_subjects):
-    data = torch.from_numpy(np.load("/mnt/Mouse_Face_Project/Desktop/Data/Julia/data/human_data.npy")[subject])
-
-    delase = DeLASEPhaser(data,
-                n_delays=None,
-                matrix_size=15,
-                delay_interval=1,
-                rank=15,
-                rank_thresh=None,
-                rank_explained_variance=None,
-                lamb=0,
-                dt=ts[1]-ts[0],
-                N_time_bins=None,
-                max_freq=None,
-                max_unstable_freq=None,
-                device=torch.device("cpu"),
-                n_segments=101,
-                verbose=True)
-
-
-    steps = np.arange(start=0, stop=101, step=25)
-    all_params, all_freqs = np.zeros(len(steps) - 1, dtype=object), np.zeros(len(steps) - 1, dtype=object)
-    for idx, (start, stop) in enumerate(zip(steps[:-1], steps[1:])):
-        print(start, stop)
-        params, freqs = delase.fit_phase_range(phase_start=start, phase_end=stop)
-        all_params[idx] = params
-        all_freqs[idx] = freqs
-
-    import matplotlib
-    matplotlib.use("kitcat")
-    import matplotlib.pyplot as plt
-
-    plt.plot(np.exp([a.cpu().numpy() for a in all_params]), marker='x')
-    plt.savefig(f"/mnt/Mouse_Face_Project/Desktop/Data/Python/delase/figures/human_{subject}_stability_by_phase.png")
-    plt.clf()
-    plt.cla()
-    plt.close('all')
+        if isinstance(self.embedded_data, torch.Tensor):
+            self.embedded_data = self.embedded_data.to(device)
