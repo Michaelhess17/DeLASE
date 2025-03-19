@@ -26,7 +26,6 @@ cuda = {version = "*", channel="nvidia/label/cuda-11.8.0"}
 pytorch = {version = "*", channel="pytorch"}
 torchvision = {version = "*", channel="pytorch"}
 pytorch-cuda = {version = "11.8.*", channel="pytorch"}
-rich = ">=13.9.4,<14"
 
 [pypi-dependencies]
 jax = {version = "*", extras = ["cuda12_pip"]}
@@ -36,3 +35,4 @@ ddfa_node = { path = "../NeuralODE/DDFA_NODE", editable = true}
 delase = { path = ".", editable = true}
 kitcat = ">=1.2.1, <2"
 matplotlib = "*"
+rich = ">=13.9.4, <14"
