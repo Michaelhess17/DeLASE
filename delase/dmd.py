@@ -469,6 +469,42 @@ class DMD:
         else:
             return pred_data
     
+    def sHAVOK(self, X, dt, r, norm):
+        X1 = X[:,:-1]
+        X2 = X[:,1:]
+        U1,_,Vh1 = np.linalg.svd(X1,full_matrices=False)
+        U2,_,Vh2 = np.linalg.svd(X2,full_matrices=False)
+        V1 = Vh1.T
+        V2 = Vh2.T
+        polys = self.true_polys(X.shape[0], dt, r, center=False)
+        for _i in range(r):
+            if (np.dot(U1[:,_i], polys[:,_i]) < 0):
+                V1[:,_i] *= -1
+            if (np.dot(U2[:,_i], polys[:,_i]) < 0):
+                V2[:,_i] *= -1
+        A = ((V2.T @ V1)[:r,:r] - np.eye(r)) / (norm * dt)
+        return A
+
+    def true_polys(self, rows, dt, r, center): 
+        m = rows // 2
+        Ut = np.linspace(-m*dt, m*dt, rows)
+        poly_stack = []
+        for j in range(r):
+            if (center):
+                poly_stack.append(Ut ** (j + 1))
+            else: 
+                poly_stack.append(Ut ** j)
+        poly_stack = np.vstack(poly_stack).T
+        Q = np.empty((rows, r)) # Perform Gram-Schmidt
+        for j in range(r): 
+            v = poly_stack[:, j]
+            for k in range(j - 1): 
+                r_jk = Q[:, k].T @ poly_stack[:, j]
+                v -= (r_jk * Q[:, k])
+            r_jj = np.linalg.norm(v)
+            Q[:, j] = v / r_jj
+        return Q
+    
     def to(self, device):
         self.device = device
         if self.data is not None:
