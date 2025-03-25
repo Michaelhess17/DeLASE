@@ -236,7 +236,7 @@ class DMD:
                 V = Vh.T
                 
                 # Get polynomials for sign correction
-                polys = self.true_polys(H.shape[0], 1.0, len(S), center=False)  # dt=1.0 as default
+                polys = self.true_polys(H.shape[1], 1.0, len(S), center=False)  # dt=1.0 as default
                 polys = torch.from_numpy(polys).float().to(self.device)
                 
                 # Correct signs based on polynomial projection
@@ -247,15 +247,15 @@ class DMD:
                     
             else:
                 # sHAVOK approach
-                X1 = H[:, :-1]
-                X2 = H[:, 1:]
-                U1, S1, Vh1 = torch.linalg.svd(X1.T, full_matrices=False)
-                U2, S2, Vh2 = torch.linalg.svd(X2.T, full_matrices=False)
+                X1 = H[:-1, :]
+                X2 = H[1:, :]
+                U1, S1, Vh1 = torch.linalg.svd(X1, full_matrices=False)
+                U2, S2, Vh2 = torch.linalg.svd(X2, full_matrices=False)
                 V1 = Vh1.T
                 V2 = Vh2.T
                 
                 # Get polynomials for sign correction
-                polys = self.true_polys(H.shape[0], 1.0, len(S1), center=False)  # dt=1.0 as default
+                polys = self.true_polys(H.shape[1], 1.0, len(S1), center=False)  # dt=1.0 as default
                 polys = torch.from_numpy(polys).float().to(self.device)
                 
                 # Correct signs based on polynomial projection
