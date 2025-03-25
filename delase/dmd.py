@@ -69,6 +69,7 @@ class DMD:
             lamb=0,
             device='cpu',
             verbose=False,
+            use_sHAVOK=False,  # Add this parameter
         ):
         """
         Parameters
@@ -112,6 +113,10 @@ class DMD:
         verbose: bool
             If True, print statements will be provided about the progress of the fitting procedure.
 
+        use_sHAVOK : bool
+            If True, uses the sHAVOK computation method which splits the Hankel matrix
+            before computing SVD. Defaults to False.
+
         Returns
          -------
          pred_data : torch.tensor
@@ -127,6 +132,7 @@ class DMD:
 
         self.device = device
         self._init_data(data)
+        self.use_sHAVOK = use_sHAVOK  # Add this line
 
         self.n_delays = n_delays
         self.delay_interval = delay_interval
@@ -213,26 +219,69 @@ class DMD:
     
     def compute_svd(self):
         """
-        Computes the SVD of the Hankel matrix.
+        Computes the SVD of the Hankel matrix, using either standard or sHAVOK approach.
         """
         with torch.no_grad():
             if self.verbose:
                 print("Computing SVD on Hankel matrix ...")
-            if self.ntrials > 1: #flatten across trials for 3d
+            
+            if self.ntrials > 1:
                 H = self.H.reshape(self.H.shape[0] * self.H.shape[1], self.H.shape[2])
             else:
                 H = self.H
             
-            # compute the SVD
-            U, S, Vh = torch.linalg.svd(H.T, full_matrices=False)
-            
-            # update attributes
-            V = Vh.T
+            if not self.use_sHAVOK:
+                # Standard HAVOK approach
+                U, S, Vh = torch.linalg.svd(H.T, full_matrices=False)
+                V = Vh.T
+                
+                # Get polynomials for sign correction
+                polys = self.true_polys(H.shape[0], 1.0, len(S), center=False)  # dt=1.0 as default
+                polys = torch.from_numpy(polys).float().to(self.device)
+                
+                # Correct signs based on polynomial projection
+                for i in range(len(S)):
+                    if torch.dot(U[:, i], polys[:, i]) < 0:
+                        U[:, i] *= -1
+                        V[:, i] *= -1
+                    
+            else:
+                # sHAVOK approach
+                X1 = H[:, :-1]
+                X2 = H[:, 1:]
+                U1, S1, Vh1 = torch.linalg.svd(X1.T, full_matrices=False)
+                U2, S2, Vh2 = torch.linalg.svd(X2.T, full_matrices=False)
+                V1 = Vh1.T
+                V2 = Vh2.T
+                
+                # Get polynomials for sign correction
+                polys = self.true_polys(H.shape[0], 1.0, len(S1), center=False)  # dt=1.0 as default
+                polys = torch.from_numpy(polys).float().to(self.device)
+                
+                # Correct signs based on polynomial projection
+                for i in range(len(S1)):
+                    if torch.dot(U1[:, i], polys[:, i]) < 0:
+                        V1[:, i] *= -1
+                    if torch.dot(U2[:, i], polys[:, i]) < 0:
+                        V2[:, i] *= -1
+                
+                # Store both sets of matrices
+                self.U1 = U1
+                self.U2 = U2
+                self.V1 = V1
+                self.V2 = V2
+                self.S1 = S1
+                self.S2 = S2
+                
+                # Use first SVD results for standard attributes
+                U, S, V = U1, S1, V1
+
+            # Update attributes
             self.U = U
             self.S = S
             self.V = V
 
-            # construct the singuar value matrix and its inverse
+            # Construct the singular value matrix and its inverse
             dim = self.n_delays * self.n
             s = len(S)
             self.S_mat = torch.zeros(dim, dim).to(self.device)
@@ -240,10 +289,9 @@ class DMD:
             self.S_mat[np.arange(s), np.arange(s)] = S
             self.S_mat_inv[np.arange(s), np.arange(s)] = 1 / S
 
-            # compute explained variance
+            # Compute explained variance
             exp_variance_inds = self.S**2 / ((self.S**2).sum())
-            cumulative_explained = torch.cumsum(exp_variance_inds, 0)
-            self.cumulative_explained_variance = cumulative_explained
+            self.cumulative_explained_variance = torch.cumsum(exp_variance_inds, 0)
             
             if self.verbose:
                 print("SVD complete!")
@@ -257,7 +305,9 @@ class DMD:
             method="NOT_precomputed",
             *,
             Vt_minus=None,
-            Vt_plus=None
+            Vt_plus=None,
+            dt=1.0,
+            norm=1.0,
         ):
         """
         Computes the Havok DMD matrix.
@@ -469,21 +519,21 @@ class DMD:
         else:
             return pred_data
     
-    def sHAVOK(self, X, dt, r, norm):
-        X1 = X[:,:-1]
-        X2 = X[:,1:]
-        U1,_,Vh1 = np.linalg.svd(X1,full_matrices=False)
-        U2,_,Vh2 = np.linalg.svd(X2,full_matrices=False)
-        V1 = Vh1.T
-        V2 = Vh2.T
-        polys = self.true_polys(X.shape[0], dt, r, center=False)
-        for _i in range(r):
-            if (np.dot(U1[:,_i], polys[:,_i]) < 0):
-                V1[:,_i] *= -1
-            if (np.dot(U2[:,_i], polys[:,_i]) < 0):
-                V2[:,_i] *= -1
-        A = ((V2.T @ V1)[:r,:r] - np.eye(r)) / (norm * dt)
-        return A
+    # def sHAVOK(self, X, dt, r, norm):
+    #     X1 = X[:,:-1]
+    #     X2 = X[:,1:]
+    #     U1,_,Vh1 = np.linalg.svd(X1,full_matrices=False)
+    #     U2,_,Vh2 = np.linalg.svd(X2,full_matrices=False)
+    #     V1 = Vh1.T
+    #     V2 = Vh2.T
+    #     polys = self.true_polys(X.shape[0], dt, r, center=False)
+    #     for _i in range(r):
+    #         if (np.dot(U1[:,_i], polys[:,_i]) < 0):
+    #             V1[:,_i] *= -1
+    #         if (np.dot(U2[:,_i], polys[:,_i]) < 0):
+    #             V2[:,_i] *= -1
+    #     A = ((V2.T @ V1)[:r,:r] - np.eye(r)) / (norm * dt)
+    #     return A
 
     def true_polys(self, rows, dt, r, center): 
         m = rows // 2

@@ -20,7 +20,8 @@ class DeLASE:
             max_freq=None,
             max_unstable_freq=None,
             device=None,
-            verbose=False
+            verbose=False,
+            use_sHAVOK=False
         ):
         self.window = data.shape[-2]
         self.n = data.shape[-1]
@@ -50,7 +51,8 @@ class DeLASE:
             rank_explained_variance=rank_explained_variance,
             lamb=lamb,
             device=device,
-            verbose=verbose
+            verbose=verbose,
+            use_sHAVOK=use_sHAVOK
         )
 
         self.Js = None
