@@ -17,12 +17,12 @@ if verbose:
 
 num_subjects = 150
 num_timesteps = 6000
-r = 250
-n_delays = 101
+r = 150
+n_delays = 251
 dt_orig = 1/100
-dt_new = 1/1000
+dt_new = 1/100
 short = 1/3
-full = 0.6
+full = 2/3
 
 # Load and preprocess data
 data_np = np.loadtxt("data/DataStorage_6000_2D_kinematics_clean.csv", delimiter=",")
@@ -161,6 +161,20 @@ def get_stability(A_havok_dmd, dt, max_freq=None, max_unstable_freq=None):
         print("Stability analysis complete")
     return chroots    
 
+def move_arrays_to_cpu(nested_dict, convert_to_float=True):
+    for key, value in nested_dict.items():
+        if isinstance(value, dict):
+            # If the value is a dictionary, recurse into it
+            move_arrays_to_cpu(value)
+        
+        elif isinstance(value, torch.Tensor):
+            # If the value is a tensor, check if it's on the GPU
+            if value.is_cuda:
+                if not convert_to_float:
+                    nested_dict[key] = value.cpu()  # Move tensor to CPU
+                else:
+                    nested_dict[key] = value.cpu().float()
+
 # Main analysis loop
 results = {}
 cmap = create_cmap('tab:blue', 'white', 'tab:orange')
@@ -209,23 +223,20 @@ with Progress() as progress:
                 print("SVD computed")
 
             elem['A1'], U, Σ, V = HAVOK(elem['H'], dt_new, r, 1, return_uv=True)
-            elem['A1'] = elem['A1'].cpu()  # Move A1 to CPU
-            U, Σ, V = U.cpu(), Σ.cpu(), V.cpu()  # Move U and V to CPU
             elem['Vh'] = V.T
             elem['S1'] = Σ
             elem['U1'] = U
             if verbose:
                 print("HAVOK dynamics matrix computed")
 
-            elem['A2'], U, Σ, _ = sHAVOK(elem['H'], dt_new, r, 1, return_uv=True)
-            U, Σ = U.cpu(), Σ.cpu()  # Move U and V to CPU
-            elem['S2'] = Σ
-            elem['U2'] = U
-            if verbose:
-                print("sHAVOK dynamics matrix computed")
+            # elem['A2'], U, Σ, _ = sHAVOK(elem['H'], dt_new, r, 1, return_uv=True)
+            # elem['S2'] = Σ
+            # elem['U2'] = U
+            # if verbose:
+                # print("sHAVOK dynamics matrix computed")
             
-            elem['ω1'] = torch.linalg.eig(elem['A1'])[0].cpu()
-            elem['ω2'] = torch.linalg.eig(elem['A2'])[0].cpu()
+            elem['ω1'] = torch.linalg.eig(elem['A1'])[0]
+            # elem['ω2'] = torch.linalg.eig(elem['A2'])[0]
             if verbose:
                 print("Eigenvalues computed")
 
@@ -237,19 +248,126 @@ with Progress() as progress:
             s = len(S)  # Number of singular values
             U = elem['U1']  # Left singular vectors from the HAVOK SVD
             dim = U.shape[1]  # Dimension of the system
-            S_mat = torch.zeros(dim, dim, dtype=DTYPE)
-            S_mat_inv = torch.zeros(dim, dim, dtype=DTYPE)
+            S_mat = torch.zeros(dim, dim, dtype=DTYPE).to(device)
+            S_mat_inv = torch.zeros(dim, dim, dtype=DTYPE).to(device)
             S_mat[np.arange(s), np.arange(s)] = S
             S_mat_inv[np.arange(s), np.arange(s)] = 1 / S
             A_havok_dmd = U @ S_mat[:dim, :r] @ A_v @ S_mat_inv[:r, :dim] @ U.T
 
             chroots, freqs = get_stability(A_havok_dmd=A_havok_dmd, dt=dt_new, max_freq=None, max_unstable_freq=None)
-            elem['chroots'] = chroots.cpu()  # Move chroots to CPU
-            elem['chroots_freqs'] = freqs.cpu()  # Move freqs to CPU
+            elem['chroots'] = chroots  # Move chroots to CPU
+            elem['chroots_freqs'] = freqs  # Move freqs to CPU
             if verbose:
                 print("Stability analysis complete")
+
+            # Move arrays to CPU for saving
+            move_arrays_to_cpu(elem, convert_to_float=True)
 
         results[subject] = {'short': pendulum_short, 'full': pendulum_full}
         progress.update(task, advance=1)
 
 torch.save(results, "outputs/sHAVOK_results.pkl") # Save results to a file
+
+subject = 130
+pendulum_short = results[subject]['short']
+pendulum_full = results[subject]['full']
+
+# Plot results
+plt.figure(figsize=(15,3),dpi=200)
+
+# Time series
+ax = plt.subplot(1,4,1)
+y_shift = 0.4
+plt.plot(np.arange(pendulum_full['n'])*dt_new, pendulum_full['xdata'].cpu().numpy(), color='gray')
+plt.plot(np.arange(pendulum_short['n'])*dt_new, pendulum_short['xdata'].cpu().numpy(),color='black')
+plt.ylim(np.min(pendulum_full['xdata'].cpu().numpy()*1.3),np.max(pendulum_full['xdata'].cpu().numpy()*1.3))
+ax.spines['right'].set_color('none')
+ax.spines['top'].set_color('none')
+plt.ylabel(r'$\sin(\theta_2)$', fontsize=14, color='white')
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.title('Time Series', fontsize=14, color='black')
+
+# HAVOK dynamics matrix 
+plt.subplot(1,4,2)
+plt.imshow(pendulum_short['A1'].cpu().numpy(),cmap=cmap)
+plt.xticks([])
+plt.yticks([])
+plt.grid('on',color='k')
+plt.title('HAVOK Dynamics Matrix', fontsize=14, color='black')
+
+# sHAVOK dynamics matrix 
+plt.subplot(1,4,3)
+plt.imshow(pendulum_short['A2'].cpu().numpy(),cmap=cmap)
+plt.xticks([])
+plt.yticks([])
+plt.title('sHAVOK Dynamics Matrix', fontsize=14, color='black')
+
+# Eigenvalues 
+ax = plt.subplot(1,4,4)
+ax.spines['bottom'].set_position('zero')
+ax.spines['left'].set_position('zero')
+ax.spines['bottom'].set_color('gray')
+ax.spines['left'].set_color('gray')
+ax.spines['top'].set_color('none')
+ax.spines['right'].set_color('none')
+plt.xticks([])
+plt.yticks([])
+plt.plot(pendulum_short['ω1'].real.cpu().numpy(),pendulum_short['ω1'].imag.cpu().numpy(),'o',color='teal',markersize=14,label='HAVOK',alpha=0.5)
+plt.plot(pendulum_short['ω2'].real.cpu().numpy(),pendulum_short['ω2'].imag.cpu().numpy(),'o',color='maroon',markersize=14,label='sHAVOK',alpha=0.5)
+plt.plot(pendulum_full['ω1'].real.cpu().numpy(),pendulum_full['ω1'].imag.cpu().numpy(),'+',color='k',markersize=14,mew=2,label='true',linewidth=20)
+plt.legend(loc='best', fontsize=14, frameon=False)
+plt.tight_layout()
+plt.title("Eigenvalues", fontsize=14, color='black')
+plt.savefig('figures/fig9a_torch.pdf', bbox_inches='tight')
+
+# Reconstruction
+plt.figure(figsize=(10, 6))
+
+plt.subplot(3,1,1)
+plt.plot(pendulum_full['Vh'][0,:].cpu().numpy(),color='k',label='Truth',linestyle='dashed')
+plt.plot(reconstruct_v(pendulum_short['A1'],pendulum_full['Vh'],r,dt_new)[0,:].cpu().numpy(),color='teal',label='HAVOK')
+plt.plot(reconstruct_v(pendulum_short['A2'],pendulum_full['Vh'],r,dt_new)[0,:].cpu().numpy(),color='maroon',label='sHAVOK')
+plt.xticks([])
+plt.yticks([])
+plt.ylim([-0.02,0.02])
+plt.legend()
+
+plt.subplot(3,1,2)
+plt.plot(pendulum_full['Vh'][1,:].cpu().numpy(),color='k',label='Truth',linestyle='dashed')
+plt.plot(reconstruct_v(pendulum_short['A1'],pendulum_full['Vh'],r,dt_new)[1,:].cpu().numpy(),color='teal',label='HAVOK')
+plt.plot(reconstruct_v(pendulum_short['A2'],pendulum_full['Vh'],r,dt_new)[1,:].cpu().numpy(),color='maroon',label='sHAVOK')
+plt.xticks([])
+plt.yticks([])
+plt.ylim([-0.02,0.02])
+plt.legend()
+
+plt.subplot(3,1,3)
+plt.plot(pendulum_full['Vh'][2,:].cpu().numpy(),color='k',label='Truth',linestyle='dashed')
+plt.plot(reconstruct_v(pendulum_short['A1'],pendulum_full['Vh'],r,dt_new)[2,:].cpu().numpy(),color='teal',label='HAVOK')
+plt.plot(reconstruct_v(pendulum_short['A2'],pendulum_full['Vh'],r,dt_new)[2,:].cpu().numpy(),color='maroon',label='sHAVOK')
+plt.xticks([])
+plt.yticks([])
+plt.ylim([-0.02,0.02])
+plt.legend()
+
+
+plt.tight_layout()
+plt.savefig('figures/fig9c_torch.pdf', bbox_inches='tight')
+
+# Plot characteristic roots
+plt.figure(figsize=(10, 6))
+ax = plt.subplot(1,1,1)
+ax.spines['right'].set_color('none')
+ax.spines['top'].set_color('none')
+xs = torch.arange(torch.sum(~torch.isnan(torch.log(pendulum_short['chroots']))))
+plt.plot(xs, torch.sort(pendulum_short['chroots'][:len(xs)], descending=True)[0], marker='o', color='teal', markersize=8, label='HAVOK')
+plt.xlabel("Characteristic Root Index", fontsize=14)
+plt.ylabel(r'$\lambda$', fontsize=14)
+plt.legend(fontsize=14, loc='best', frameon=False)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.tight_layout()
+
+plt.savefig('figures/fig9b_torch.pdf', bbox_inches='tight')
+

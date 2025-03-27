@@ -121,8 +121,8 @@ plt.tight_layout()
 plt.savefig('figures/interpolated_data.png', bbox_inches='tight')
 
 # Define parameters 
-r = 100
-rows = 101
+r = 150
+rows = 201
 dt = dt_new
 
 pendulum_short = dict()
@@ -213,7 +213,7 @@ plt.figure(figsize=(10,2))
 
 plt.subplot(1,1,1)
 plt.plot(pendulum_full['Vh'][0,:],color='k',label='Truth',linestyle='dashed')
-# plt.plot(reconstruct_v(pendulum_recon['A1'],pendulum_reconf['Vh'],r,dt)[0,:],color='teal',label='HAVOK')
+plt.plot(reconstruct_v(pendulum_short['A1'],pendulum_full['Vh'],r,dt)[0,:],color='teal',label='HAVOK')
 plt.plot(reconstruct_v(pendulum_short['A2'],pendulum_full['Vh'],r,dt)[0,:],color='maroon',label='sHAVOK')
 plt.xticks([])
 plt.yticks([])
