@@ -1,13 +1,14 @@
 from delase import DeLASE
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 
 data = np.loadtxt("data/DataStorage_6000_2D_kinematics_clean.csv", delimiter=",")
 
 num_subjects = 150
 num_timesteps = 6000
 data = data.reshape(data.shape[0], num_subjects, num_timesteps).swapaxes(0, 1).swapaxes(1, 2)
-all_all_params = np.zeros(data.shape[0], dtype=object)
+all_params = np.zeros(data.shape[0], dtype=object)
 for subject in range(data.shape[0]):
     subject_data = data[subject]
     dt = 1/100
@@ -15,9 +16,9 @@ for subject in range(data.shape[0]):
 
     delase = DeLASE(subject_data,
                     n_delays=None,
-                    matrix_size=50,
+                    matrix_size=10,
                     delay_interval=1,
-                    rank=50,
+                    rank=10,
                     rank_thresh=None,
                     rank_explained_variance=None,
                     lamb=0,
@@ -28,3 +29,7 @@ for subject in range(data.shape[0]):
                     device=torch.device("cuda"),
                     verbose=False)
 
+
+    delase.fit()
+    params = delase.stability_params
+    all_params[subject] = params.cpu()
