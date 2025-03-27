@@ -1,4 +1,3 @@
-from delase.delase_phase import DeLASEPhaser
 from delase import DeLASE
 import numpy as np
 import pandas as pd

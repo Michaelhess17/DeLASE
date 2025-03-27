@@ -4,6 +4,8 @@ import torch
 from scipy.interpolate import make_smoothing_spline
 from delase import embed_signal_torch
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib import cm
 import seaborn as sns
 from rich.progress import Progress
 import pandas as pd
@@ -86,8 +88,6 @@ all_eigenvalues = np.array([results[subject]["eigenvalues"].detach().cpu().numpy
 # Figure 1
 
 # Create colormap based on extremes of speeds
-import matplotlib.colors as mcolors
-from matplotlib import cm
 
 norm = mcolors.Normalize(vmin=min(speeds), vmax=max(speeds))
 cmap = cm.get_cmap("viridis")
