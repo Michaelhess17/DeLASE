@@ -36,3 +36,5 @@ delase = { path = ".", editable = true}
 kitcat = ">=1.2.1, <2"
 matplotlib = "*"
 rich = ">=13.9.4, <14"
+tensorboard = "*"
+torch-tb-profiler = ">=0.4.3, <0.5"

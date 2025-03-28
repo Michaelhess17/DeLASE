@@ -51,13 +51,18 @@ model = KoopmanAE(
     input_dim=train_data.shape[1],
     hidden_dim=64,
     output_dim=6,
+    num_subjects=1,
     depth=3,
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
+print(torch.linalg.eigvals(model.A[0]), model.A.shape)
+
+subject_indices = torch.zeros(train_data.shape[0]-1, dtype=torch.int64).to(model.device)
 
 losses = train_koopman_ae(
     model,
     train_data,
+    subject_indices,
     n_epochs=500,
     batch_size=128,
     learning_rate=1e-3
