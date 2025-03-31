@@ -142,3 +142,19 @@ def results_to_dataframe(results):
             'Best_Poly_BIC': poly['bic']
         })
     return pl.DataFrame(data)
+
+def plot_eigvals_on_unit_circle(eigvals, c=None):
+    if c is None:
+        c = 'b'
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax1 = ax.scatter(eigvals.real, eigvals.imag, c=c, s=5)
+    t = np.linspace(0, 2*np.pi, 100)
+    ax.plot(np.cos(t), np.sin(t), c='k', linewidth=1)
+    ax.set_aspect('equal', 'box')
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
+    ax.set_xlabel('Real')
+    ax.set_ylabel('Imaginary')
+    ax.set_title('Eigenvalues on the Unit Circle')
+    fig.colorbar(ax1, ax=ax)
+    plt.show()
