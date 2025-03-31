@@ -26,6 +26,7 @@ cuda = {version = "*", channel="nvidia/label/cuda-11.8.0"}
 pytorch = {version = "*", channel="pytorch"}
 torchvision = {version = "*", channel="pytorch"}
 pytorch-cuda = {version = "11.8.*", channel="pytorch"}
+statsmodels = ">=0.14.4,<0.15"
 
 [pypi-dependencies]
 jax = {version = "*", extras = ["cuda12_pip"]}
