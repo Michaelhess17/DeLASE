@@ -37,3 +37,6 @@ delase = { path = ".", editable = true}
 kitcat = ">=1.2.1, <2"
 matplotlib = "*"
 rich = ">=13.9.4, <14"
+kooplearn = ">=1.1.3, <2"
+pot = ">=0.9.5, <0.10"
+omegaconf = ">=2.3.0, <3"
